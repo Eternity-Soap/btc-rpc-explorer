@@ -81,23 +81,9 @@ function getRandomString(length, chars) {
 	return result;
 }
 
-function formatBytes(bytesInt) {
-	var scales = [ {val:1000000000000000, name:"PB"}, {val:1000000000000, name:"TB"}, {val:1000000000, name:"GB"}, {val:1000000, name:"MB"}, {val:1000, name:"KB"} ];
-	for (var i = 0; i < scales.length; i++) {
-		var item = scales[i];
-
-		var fraction = Math.floor(bytesInt / item.val);
-		if (fraction >= 1) {
-			return fraction.toLocaleString() + " " + item.name;
-		}
-	}
-
-	return Math.floor(bytesInt) + " B";
-}
-
 var formatCurrencyCache = {};
 
-function formatCurrencyAmount(amount, formatType) {
+function formatCurrencyAmountWithForcedDecimalPlaces(amount, formatType, forcedDecimalPlaces) {
 	if (formatCurrencyCache[formatType]) {
 		var dec = new Decimal(amount);
 		dec = dec.times(formatCurrencyCache[formatType].multiplier);
@@ -105,6 +91,10 @@ function formatCurrencyAmount(amount, formatType) {
 		var decimalPlaces = formatCurrencyCache[formatType].decimalPlaces;
 		if (decimalPlaces == 0 && dec < 1) {
 			decimalPlaces = 5;
+		}
+
+		if (forcedDecimalPlaces >= 0) {
+			decimalPlaces = forcedDecimalPlaces;
 		}
 
 		return addThousandsSeparators(dec.toDecimalPlaces(decimalPlaces)) + " " + formatCurrencyCache[formatType].name;
@@ -127,6 +117,10 @@ function formatCurrencyAmount(amount, formatType) {
 					decimalPlaces = 5;
 				}
 
+				if (forcedDecimalPlaces >= 0) {
+					decimalPlaces = forcedDecimalPlaces;
+				}
+
 				return addThousandsSeparators(dec.toDecimalPlaces(decimalPlaces)) + " " + currencyUnit.name;
 			}
 		}
@@ -135,8 +129,12 @@ function formatCurrencyAmount(amount, formatType) {
 	return amount;
 }
 
-function formatCurrencyAmountInSmallestUnits(amount) {
-	return formatCurrencyAmount(amount, coins[config.coin].currencyUnits[coins[config.coin].currencyUnits.length - 1].name);
+function formatCurrencyAmount(amount, formatType) {
+	return formatCurrencyAmountWithForcedDecimalPlaces(amount, formatType, -1);
+}
+
+function formatCurrencyAmountInSmallestUnits(amount, forcedDecimalPlaces) {
+	return formatCurrencyAmountWithForcedDecimalPlaces(amount, coins[config.coin].currencyUnits[coins[config.coin].currencyUnits.length - 1].name, forcedDecimalPlaces);
 }
 
 // ref: https://stackoverflow.com/a/2901298/673828
@@ -183,33 +181,72 @@ function getMinerFromCoinbaseTx(tx) {
 		return null;
 	}
 	
-	if (global.miningPoolsConfig) {
-		for (var payoutAddress in global.miningPoolsConfig.payout_addresses) {
-			if (global.miningPoolsConfig.payout_addresses.hasOwnProperty(payoutAddress)) {
-				if (tx.vout && tx.vout.length > 0 && tx.vout[0].scriptPubKey && tx.vout[0].scriptPubKey.addresses && tx.vout[0].scriptPubKey.addresses.length > 0) {
-					if (tx.vout[0].scriptPubKey.addresses[0] == payoutAddress) {
-						var minerInfo = global.miningPoolsConfig.payout_addresses[payoutAddress];
-						minerInfo.identifiedBy = "payout address " + payoutAddress;
+	if (global.miningPoolsConfigs) {
+		for (var i = 0; i < global.miningPoolsConfigs.length; i++) {
+			var miningPoolsConfig = global.miningPoolsConfigs[i];
+
+			for (var payoutAddress in miningPoolsConfig.payout_addresses) {
+				if (miningPoolsConfig.payout_addresses.hasOwnProperty(payoutAddress)) {
+					if (tx.vout && tx.vout.length > 0 && tx.vout[0].scriptPubKey && tx.vout[0].scriptPubKey.addresses && tx.vout[0].scriptPubKey.addresses.length > 0) {
+						if (tx.vout[0].scriptPubKey.addresses[0] == payoutAddress) {
+							var minerInfo = miningPoolsConfig.payout_addresses[payoutAddress];
+							minerInfo.identifiedBy = "payout address " + payoutAddress;
+
+							return minerInfo;
+						}
+					}
+				}
+			}
+
+			for (var coinbaseTag in miningPoolsConfig.coinbase_tags) {
+				if (miningPoolsConfig.coinbase_tags.hasOwnProperty(coinbaseTag)) {
+					if (hex2ascii(tx.vin[0].coinbase).indexOf(coinbaseTag) != -1) {
+						var minerInfo = miningPoolsConfig.coinbase_tags[coinbaseTag];
+						minerInfo.identifiedBy = "coinbase tag '" + coinbaseTag + "'";
 
 						return minerInfo;
 					}
 				}
 			}
 		}
-
-		for (var coinbaseTag in global.miningPoolsConfig.coinbase_tags) {
-			if (global.miningPoolsConfig.coinbase_tags.hasOwnProperty(coinbaseTag)) {
-				if (hex2ascii(tx.vin[0].coinbase).indexOf(coinbaseTag) != -1) {
-					var minerInfo = global.miningPoolsConfig.coinbase_tags[coinbaseTag];
-					minerInfo.identifiedBy = "coinbase tag '" + coinbaseTag + "'";
-
-					return minerInfo;
-				}
-			}
-		}
 	}
 
 	return null;
+}
+
+function getTxTotalInputOutputValues(tx, txInputs, blockHeight) {
+	var totalInputValue = new Decimal(0);
+	var totalOutputValue = new Decimal(0);
+
+	try {
+		for (var i = 0; i < tx.vin.length; i++) {
+			if (tx.vin[i].coinbase) {
+				totalInputValue = totalInputValue.plus(new Decimal(coinConfig.blockRewardFunction(blockHeight)));
+
+			} else {
+				var txInput = txInputs[i];
+
+				if (txInput) {
+					try {
+						var vout = txInput.vout[tx.vin[i].vout];
+						if (vout.value) {
+							totalInputValue = totalInputValue.plus(new Decimal(vout.value));
+						}
+					} catch (err) {
+						console.log("Error getting tx.totalInputValue: err=" + err + ", txid=" + tx.txid + ", index=tx.vin[" + i + "]");
+					}
+				}
+			}
+		}
+		
+		for (var i = 0; i < tx.vout.length; i++) {
+			totalOutputValue = totalOutputValue.plus(new Decimal(tx.vout[i].value));
+		}
+	} catch (err) {
+		console.log("Error computing total input/output values for tx: err=" + err + ", tx=" + JSON.stringify(tx) + ", txInputs=" + JSON.stringify(txInputs) + ", blockHeight=" + blockHeight);
+	}
+
+	return {input:totalInputValue, output:totalOutputValue};
 }
 
 function getBlockTotalFeesFromCoinbaseTxAndBlockHeight(coinbaseTx, blockHeight) {
@@ -345,8 +382,8 @@ module.exports = {
 	hex2ascii: hex2ascii,
 	splitArrayIntoChunks: splitArrayIntoChunks,
 	getRandomString: getRandomString,
-	formatBytes: formatBytes,
 	formatCurrencyAmount: formatCurrencyAmount,
+	formatCurrencyAmountWithForcedDecimalPlaces: formatCurrencyAmountWithForcedDecimalPlaces,
 	formatExchangedCurrency: formatExchangedCurrency,
 	addThousandsSeparators: addThousandsSeparators,
 	formatCurrencyAmountInSmallestUnits: formatCurrencyAmountInSmallestUnits,
@@ -358,5 +395,6 @@ module.exports = {
 	refreshExchangeRate: refreshExchangeRate,
 	parseExponentStringDouble: parseExponentStringDouble,
 	formatLargeNumber: formatLargeNumber,
-	geoLocateIpAddresses: geoLocateIpAddresses
+	geoLocateIpAddresses: geoLocateIpAddresses,
+	getTxTotalInputOutputValues: getTxTotalInputOutputValues
 };

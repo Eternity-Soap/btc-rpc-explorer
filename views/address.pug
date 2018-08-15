@@ -18,14 +18,25 @@ block content
 
 			if (payoutAddressForMiner)
 				div(class="alert alert-primary", style="padding-bottom: 0;")
+					div(class="float-left", style="width: 50px; height: 50px; font-size: 18px;")
+						i(class="fas fa-certificate fa-2x", style="margin-top: 10px;")
+
 					h4(class="alert-heading h5") #{coinConfig.name} Fun
 
 					p
-						span This looks like a miner payout address for the pool 
-						strong #{payoutAddressForMiner.name}
-						span  (see the configuration 
-						a(href=coinConfig.miningPoolsConfigUrl) here
-						span )
+						span This looks like a miner payout address for  
+						span(class="font-weight-bold") #{payoutAddressForMiner.name}
+						if (coinConfig.miningPoolsConfigUrls.length > 1)
+							span  (see the configurations: 
+							each item, index in coinConfig.miningPoolsConfigUrls
+								if (index > 0)
+									span , 
+								a(href=item) config ##{index + 1}
+							span )
+						else
+							span  (see the configuration
+							a(href=coinConfig.miningPoolsConfigUrls[0]) here
+							span )
 
 			if (false)
 				pre
@@ -33,49 +44,54 @@ block content
 			
 			ul(class='nav nav-tabs mb-3')
 				li(class="nav-item")
-					a(data-toggle="tab", href="#tab-summary", class="nav-link active", role="tab") Summary
+					a(data-toggle="tab", href="#tab-details", class="nav-link active", role="tab") Details
 				li(class="nav-item")
-					a(data-toggle="tab", href="#tab-raw", class="nav-link", role="tab") Raw
+					a(data-toggle="tab", href="#tab-json", class="nav-link", role="tab") JSON
 
 
 			div(class="tab-content")
-				div(id="tab-summary", class="tab-pane active", role="tabpanel")
-					table(class="table")
-						if (addressObj.hash)
-							tr
-								th(class="table-active properties-header") Hash 160
-								td(class="monospace") #{addressObj.hash.toString("hex")}
+				div(id="tab-details", class="tab-pane active", role="tabpanel")
 
-						if (result.validateaddress.scriptPubKey)
-							tr
-								th(class="table-active properties-header") Script Public Key
-								td(class="monospace") #{result.validateaddress.scriptPubKey}
+					div(class="card mb-3")
+						div(class="card-header")
+							span(class="h6") Summary
+						div(class="card-body")
 
-						if (addressObj.hasOwnProperty("version"))
-							tr
-								th(class="table-active properties-header") Version
-								td(class="monospace") #{addressObj.version}
+							if (addressObj.hash)
+								div(class="row")
+									div(class="summary-table-label") Hash 160
+									div(class="summary-table-content monospace") #{addressObj.hash.toString("hex")}
 
-						if (result.validateaddress.hasOwnProperty("witness_version"))
-							tr
-								th(class="table-active properties-header") Witness Version
-								td(class="monospace") #{result.validateaddress.witness_version}
+							if (result.validateaddress.scriptPubKey)
+								div(class="row")
+									div(class="summary-table-label") Script Public Key
+									div(class="summary-table-content monospace") #{result.validateaddress.scriptPubKey}
 
-						if (result.validateaddress.witness_program)
-							tr
-								th(class="table-active properties-header") Witness Program
-								td(class="monospace") #{result.validateaddress.witness_program}
+							if (addressObj.hasOwnProperty("version"))
+								div(class="row")
+									div(class="summary-table-label") Version
+									div(class="summary-table-content monospace") #{addressObj.version}
 
-						tr
-							th(class="table-active properties-header") QR Code
-							td(class="monospace")
-								img(src=addressQrCodeUrl, alt=address)
+							if (result.validateaddress.hasOwnProperty("witness_version"))
+								div(class="row")
+									div(class="summary-table-label") Witness Version
+									div(class="summary-table-content monospace") #{result.validateaddress.witness_version}
+
+							if (result.validateaddress.witness_program)
+								div(class="row")
+									div(class="summary-table-label") Witness Program
+									div(class="summary-table-content monospace") #{result.validateaddress.witness_program}
+
+							div(class="row")
+								div(class="summary-table-label") QR Code
+								div(class="summary-table-content monospace")
+									img(src=addressQrCodeUrl, alt=address, style="border: solid 1px #ccc;")
 
 					div(class="card mb-3")
 						div(class="card-header")
 							span(class="h6") Flags
 						div(class="card-body")
-							table(class="table text-center")
+							table(class="table table-responsive-sm text-center")
 								thead
 									tr
 										th Is Valid?
@@ -107,7 +123,7 @@ block content
 								a(href="https://github.com/janoside/btc-rpc-explorer/issues/8") Suggestions and/or pull requests are welcome!
 				
 
-				div(id="tab-raw", class="tab-pane", role="tabpanel")
+				div(id="tab-json", class="tab-pane", role="tabpanel")
 					div(class="highlight")
 						pre
 							code(class="language-json", data-lang="json") #{JSON.stringify(result.validateaddress, null, 4)}

@@ -108,6 +108,7 @@ app.runOnStartup = function() {
 
 	global.specialTransactions = {};
 	global.specialBlocks = {};
+	global.specialAddresses = {};
 
 	if (global.coinConfig.historicalData) {
 		global.coinConfig.historicalData.forEach(function(item) {
@@ -120,20 +121,41 @@ app.runOnStartup = function() {
 		});
 	}
 
-	if (global.coinConfig.miningPoolsConfigUrl) {
-		request(global.coinConfig.miningPoolsConfigUrl, function(error, response, body) {
-			if (!error && response && response.statusCode && response.statusCode == 200) {
-				var responseBody = JSON.parse(body);
+	if (global.coinConfig.miningPoolsConfigUrls) {
+		var promises = [];
 
-				global.miningPoolsConfig = responseBody;
-				
-			} else {
-				console.log("Error:");
-				console.log(error);
-				console.log("Response:");
-				console.log(response);
+		for (var i = 0; i < global.coinConfig.miningPoolsConfigUrls.length; i++) {
+			promises.push(new Promise(function(resolve, reject) {
+				request(global.coinConfig.miningPoolsConfigUrls[i], function(error, response, body) {
+					if (!error && response && response.statusCode && response.statusCode == 200) {
+						var responseBody = JSON.parse(body);
+
+						resolve(responseBody);
+						
+					} else {
+						console.log("Error:");
+						console.log(error);
+						console.log("Response:");
+						console.log(response);
+
+						resolve({"coinbase_tags" : {}, "payout_addresses":{}});
+					}
+				});
+			}));
+		}
+
+		Promise.all(promises).then(function(results) {
+			global.miningPoolsConfigs = results;
+
+			for (var i = 0; i < global.miningPoolsConfigs.length; i++) {
+				for (var x in global.miningPoolsConfigs[i].payout_addresses) {
+					if (global.miningPoolsConfigs[i].payout_addresses.hasOwnProperty(x)) {
+						global.specialAddresses[x] = global.miningPoolsConfigs[i].payout_addresses[x];
+					}
+				}
 			}
 		});
+		
 	}
 
 	if (global.sourcecodeVersion == null) {
@@ -202,6 +224,18 @@ app.use(function(req, res, next) {
 
 		} else {
 			req.session.uiTheme = "";
+		}
+	}
+
+	// theme
+	if (!req.session.hideHomepageBanner) {
+		var cookieValue = req.cookies['user-setting-hideHomepageBanner'];
+
+		if (cookieValue) {
+			req.session.hideHomepageBanner = cookieValue;
+
+		} else {
+			req.session.hideHomepageBanner = "false";
 		}
 	}
 

@@ -31,6 +31,8 @@ router.get("/", function(req, res) {
 		return;
 	}
 
+	res.locals.homepage = true;
+
 	var promises = [];
 
 	promises.push(coreApi.getMempoolInfo());
@@ -498,8 +500,10 @@ router.get("/address/:address", function(req, res) {
 		}
 	}
 
-	if (global.miningPoolsConfig.payout_addresses[address]) {
-		res.locals.payoutAddressForMiner = global.miningPoolsConfig.payout_addresses[address];
+	for (var i = 0; i < global.miningPoolsConfigs.length; i++) {
+		if (global.miningPoolsConfigs[i].payout_addresses[address]) {
+			res.locals.payoutAddressForMiner = global.miningPoolsConfigs[i].payout_addresses[address];
+		}
 	}
 	
 	coreApi.getAddress(address).then(function(result) {
@@ -703,6 +707,40 @@ router.get("/rpc-browser", function(req, res) {
 	});
 });
 
+router.get("/unconfirmed-tx", function(req, res) {
+	var limit = config.site.browseBlocksPageSize;
+	var offset = 0;
+	var sort = "desc";
+
+	if (req.query.limit) {
+		limit = parseInt(req.query.limit);
+	}
+
+	if (req.query.offset) {
+		offset = parseInt(req.query.offset);
+	}
+
+	if (req.query.sort) {
+		sort = req.query.sort;
+	}
+
+	res.locals.limit = limit;
+	res.locals.offset = offset;
+	res.locals.sort = sort;
+	res.locals.paginationBaseUrl = "/unconfirmed-tx";
+
+	coreApi.getMempoolDetails(offset, limit).then(function(mempoolDetails) {
+		res.locals.mempoolDetails = mempoolDetails;
+
+		res.render("unconfirmed-transactions");
+
+	}).catch(function(err) {
+		res.locals.userMessage = "Error: " + err;
+
+		res.render("unconfirmed-transactions");
+	});
+});
+
 router.get("/tx-stats", function(req, res) {
 	var dataPoints = 150;
 
@@ -748,7 +786,7 @@ router.get("/tx-stats", function(req, res) {
 
 			res.locals.txStats = txStats;
 
-			console.log("res: " + JSON.stringify(results));
+			//console.log("res: " + JSON.stringify(results));
 
 			res.render("tx-stats");
 		});
