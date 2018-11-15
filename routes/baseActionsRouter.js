@@ -5,6 +5,9 @@ var moment = require('moment');
 var bitcoinCore = require("bitcoin-core");
 var qrcode = require('qrcode');
 var bitcoinjs = require('bitcoinjs-lib');
+var sha256 = require("crypto-js/sha256");
+var hexEnc = require("crypto-js/enc-hex");
+var Decimal = require("decimal.js");
 
 var utils = require('./../app/utils.js');
 var coins = require("./../app/coins.js");
@@ -278,6 +281,17 @@ router.get("/blocks", function(req, res) {
 	});
 });
 
+router.get("/search", function(req, res) {
+	if (!req.body.query) {
+		req.session.userMessage = "Enter a block height, block hash, or transaction id.";
+		req.session.userMessageType = "primary";
+
+		res.render("search");
+
+		return;
+	}
+});
+
 router.post("/search", function(req, res) {
 	if (!req.body.query) {
 		req.session.userMessage = "Enter a block height, block hash, or transaction id.";
@@ -381,9 +395,15 @@ router.get("/block-height/:blockHeight", function(req, res) {
 	var limit = config.site.blockTxPageSize;
 	var offset = 0;
 
-	// for demo sites, keep page sizes static
-	if (!config.demoSite && req.query.limit) {
+	if (req.query.limit) {
 		limit = parseInt(req.query.limit);
+
+		// for demo sites, limit page sizes
+		if (config.demoSite && limit > config.site.blockTxPageSize) {
+			limit = config.site.blockTxPageSize;
+
+			res.locals.userMessage = "Transaction page size limited to " + config.site.blockTxPageSize + ". If this is your site, you can change or disable this limit in the site config.";
+		}
 	}
 
 	if (req.query.offset) {
@@ -417,9 +437,15 @@ router.get("/block/:blockHash", function(req, res) {
 	var limit = config.site.blockTxPageSize;
 	var offset = 0;
 
-	// for demo sites, keep page sizes static
-	if (!config.demoSite && req.query.limit) {
+	if (req.query.limit) {
 		limit = parseInt(req.query.limit);
+
+		// for demo sites, limit page sizes
+		if (config.demoSite && limit > config.site.blockTxPageSize) {
+			limit = config.site.blockTxPageSize;
+
+			res.locals.userMessage = "Transaction page size limited to " + config.site.blockTxPageSize + ". If this is your site, you can change or disable this limit in the site config.";
+		}
 	}
 
 	if (req.query.offset) {
@@ -480,9 +506,39 @@ router.get("/tx/:transactionId", function(req, res) {
 });
 
 router.get("/address/:address", function(req, res) {
+	var limit = config.site.addressTxPageSize;
+	var offset = 0;
+	var sort = "desc";
+
+	
+	if (req.query.limit) {
+		limit = parseInt(req.query.limit);
+
+		// for demo sites, limit page sizes
+		if (config.demoSite && limit > config.site.addressTxPageSize) {
+			limit = config.site.addressTxPageSize;
+
+			res.locals.userMessage = "Transaction page size limited to " + config.site.addressTxPageSize + ". If this is your site, you can change or disable this limit in the site config.";
+		}
+	}
+
+	if (req.query.offset) {
+		offset = parseInt(req.query.offset);
+	}
+
+	if (req.query.sort) {
+		sort = req.query.sort;
+	}
+
+
 	var address = req.params.address;
 
 	res.locals.address = address;
+	res.locals.limit = limit;
+	res.locals.offset = offset;
+	res.locals.sort = sort;
+	res.locals.paginationBaseUrl = ("/address/" + address + "?sort=" + sort);
+	res.locals.transactions = [];
 	
 	res.locals.result = {};
 
@@ -500,24 +556,179 @@ router.get("/address/:address", function(req, res) {
 		}
 	}
 
-	for (var i = 0; i < global.miningPoolsConfigs.length; i++) {
-		if (global.miningPoolsConfigs[i].payout_addresses[address]) {
-			res.locals.payoutAddressForMiner = global.miningPoolsConfigs[i].payout_addresses[address];
+	if (global.miningPoolsConfigs) {
+		for (var i = 0; i < global.miningPoolsConfigs.length; i++) {
+			if (global.miningPoolsConfigs[i].payout_addresses[address]) {
+				res.locals.payoutAddressForMiner = global.miningPoolsConfigs[i].payout_addresses[address];
+			}
 		}
 	}
-	
-	coreApi.getAddress(address).then(function(result) {
-		res.locals.result.validateaddress = result;
 
-		qrcode.toDataURL(address, function(err, url) {
-			if (err) {
-				console.log("Error 93ygfew0ygf2gf2: " + err);
-			}
+	res.locals.advancedFunctionality = (global.electrumApi != null);
 
-			res.locals.addressQrCodeUrl = url;
+	coreApi.getAddress(address).then(function(validateaddressResult) {
+		res.locals.result.validateaddress = validateaddressResult;
 
-			res.render("address");
+		var promises = [];
+		if (global.electrumApi) {
+			var addrScripthash = hexEnc.stringify(sha256(hexEnc.parse(validateaddressResult.scriptPubKey)));
+			addrScripthash = addrScripthash.match(/.{2}/g).reverse().join("");
+
+			res.locals.electrumScripthash = addrScripthash;
+
+			promises.push(new Promise(function(resolve, reject) {
+				electrumApi.getAddressBalance(addrScripthash).then(function(result) {
+					res.locals.balance = result;
+
+					res.locals.electrumBalance = result;
+
+					resolve();
+
+				}).catch(function(err) {
+					reject(err);
+				});
+			}));
+
+			promises.push(new Promise(function(resolve, reject) {
+				electrumApi.getAddressTxids(addrScripthash).then(function(result) {
+					var txidResult = null;
+
+					if (result.conflictedResults) {
+						res.locals.conflictedTxidResults = true;
+
+						txidResult = result.conflictedResults[0];
+
+					} else if (result.result != null) {
+						txidResult = result;
+					}
+
+					res.locals.electrumHistory = txidResult;
+
+					var txids = [];
+					var blockHeightsByTxid = {};
+
+					if (txidResult) {
+						for (var i = 0; i < txidResult.result.length; i++) {
+							txids.push(txidResult.result[i].tx_hash);
+							blockHeightsByTxid[txidResult.result[i].tx_hash] = txidResult.result[i].height;
+						}
+					}
+
+					if (sort == "desc") {
+						txids = txids.reverse();
+					}
+
+					res.locals.txids = txids;
+
+					var pagedTxids = [];
+					for (var i = offset; i < (offset + limit); i++) {
+						if (txids.length > i) {
+							pagedTxids.push(txids[i]);
+						}
+					}
+
+					if (txidResult && txidResult.result != null) {
+						// since we always request the first txid (to determine "first seen" info for the address),
+						// remove it for proper paging
+						pagedTxids.unshift(txidResult.result[0].tx_hash);
+					}
+					
+					coreApi.getRawTransactionsWithInputs(pagedTxids).then(function(rawTxResult) {
+						// first result is always the earliest tx, but doesn't fit into the current paging;
+						// store it as firstSeenTransaction then remove from list
+						res.locals.firstSeenTransaction = rawTxResult.transactions[0];
+						rawTxResult.transactions.shift();
+
+						res.locals.transactions = rawTxResult.transactions;
+						res.locals.txInputsByTransaction = rawTxResult.txInputsByTransaction;
+						res.locals.blockHeightsByTxid = blockHeightsByTxid;
+
+						var addrGainsByTx = {};
+						var addrLossesByTx = {};
+
+						res.locals.addrGainsByTx = addrGainsByTx;
+						res.locals.addrLossesByTx = addrLossesByTx;
+
+						for (var i = 0; i < rawTxResult.transactions.length; i++) {
+							var tx = rawTxResult.transactions[i];
+							var txInputs = rawTxResult.txInputsByTransaction[tx.txid];
+
+							for (var j = 0; j < tx.vout.length; j++) {
+								if (tx.vout[j].value > 0 && tx.vout[j].scriptPubKey && tx.vout[j].scriptPubKey.addresses && tx.vout[j].scriptPubKey.addresses.includes(address)) {
+									if (addrGainsByTx[tx.txid] == null) {
+										addrGainsByTx[tx.txid] = new Decimal(0);
+									}
+
+									addrGainsByTx[tx.txid] = addrGainsByTx[tx.txid].plus(new Decimal(tx.vout[j].value));
+								}
+							}
+
+							for (var j = 0; j < tx.vin.length; j++) {
+								var txInput = txInputs[j];
+
+								if (txInput != null) {
+									for (var k = 0; k < txInput.vout.length; k++) {
+										if (txInput.vout[k] && txInput.vout[k].scriptPubKey && txInput.vout[k].scriptPubKey.addresses && txInput.vout[k].scriptPubKey.addresses.includes(address)) {
+											if (addrLossesByTx[tx.txid] == null) {
+												addrLossesByTx[tx.txid] = new Decimal(0);
+											}
+
+											addrLossesByTx[tx.txid] = addrLossesByTx[tx.txid].plus(new Decimal(txInput.vout[k].value));
+										}
+									}
+								}
+							}
+
+							//console.log("tx: " + JSON.stringify(tx));
+							//console.log("txInputs: " + JSON.stringify(txInputs));
+						}
+
+						resolve();
+
+					}).catch(function(err) {
+						console.log("Error asdgf07uh23: " + err + ", error json: " + JSON.stringify(err));
+
+						reject(err);
+					});
+				
+				}).catch(function(err) {
+					res.locals.electrumHistoryError = err;
+
+					console.log("Error 23t07ug2wghefud: " + err + ", error json: " + JSON.stringify(err));
+
+					reject(err);
+				});
+			}));
+
+			promises.push(new Promise(function(resolve, reject) {
+				coreApi.getBlockchainInfo().then(function(getblockchaininfo) {
+					res.locals.getblockchaininfo = getblockchaininfo;
+
+					resolve();
+
+				}).catch(function(err) {
+					console.log("Error 132r80h32rh: " + err + ", error json: " + JSON.stringify(err));
+
+					reject(err);
+				});
+			}));
+		}
+
+		Promise.all(promises).catch(function(err) {
+			console.log("Error 32197rgh327g2: " + err + ", error json: " + JSON.stringify(err));
+
+		}).finally(function() {
+			qrcode.toDataURL(address, function(err, url) {
+				if (err) {
+					console.log("Error 93ygfew0ygf2gf2: " + err);
+				}
+
+				res.locals.addressQrCodeUrl = url;
+
+				res.render("address");
+			});
 		});
+		
 	}).catch(function(err) {
 		res.locals.userMessage = "Failed to load address " + address + " (" + err + ")";
 

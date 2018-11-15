@@ -149,14 +149,15 @@ html(lang="en")
 								dd
 									div(class="text-md-right text-center")
 										each coin, index in config.donationAddresses.coins
-											div(style="display: inline-block;", class="text-center mb-3", class=(index > 0 ? "ml-md-3" : false))
+											div(style="display: inline-block; max-width: 150px;", class="text-center mb-3 word-wrap monospace", class=(index > 0 ? "ml-md-3" : false))
 												img(src=donationAddressQrCodeUrls[coin], alt=config.donationAddresses[coin].address, style="border: solid 1px #ccc;")
 												br
-												if (config.donationAddresses[coin].urlPrefix)
+												if (coinConfig.ticker == coin)
 													span #{coin}: 
-													a(href=(config.donationAddresses[coin].urlPrefix + config.donationAddresses[coin].address)) #{config.donationAddresses[coin].address.substring(0, 10)}...
+													a(href=("/address/" + config.donationAddresses[coin].address)) #{config.donationAddresses[coin].address}
 												else
-													span #{coin}
+													span #{coin}: 
+													a(href=(config.donationAddresses.sites[coin] + "/address/" + config.donationAddresses[coin].address)) #{config.donationAddresses[coin].address}
 		
 		script(src="https://code.jquery.com/jquery-3.3.1.min.js", integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=", crossorigin="anonymous")
 		script(src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.0/umd/popper.min.js", integrity="sha384-cs/chFZiN24E4KMATLdqdvsezGxaGsi4hLGOzlXwp5UZB1LY//20VyM2taTB4QvJ", crossorigin="anonymous")
@@ -175,9 +176,9 @@ html(lang="en")
 			hljs.initHighlightingOnLoad();
 
 		if (config.credentials.sentryUrl && config.credentials.sentryUrl.length > 0)
-			script(src="https://cdn.ravenjs.com/3.26.4/raven.min.js", crossorigin="anonymous")
+			script(src="https://browser.sentry-cdn.com/4.0.4/bundle.min.js", crossorigin="anonymous")
 			script.
-				Raven.config("#{config.credentials.sentryUrl}").install();
+				Sentry.init({ dsn: '#{config.credentials.sentryUrl}' });
 
 		if (config.credentials.googleAnalyticsTrackingId && config.credentials.googleAnalyticsTrackingId.trim().length > 0)
 			script(async, src=("https://www.googletagmanager.com/gtag/js?id=" + config.credentials.googleAnalyticsTrackingId))

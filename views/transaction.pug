@@ -42,10 +42,10 @@ block content
 			div(id="tab-details", class="tab-pane active", role="tabpanel")
 				if (global.specialTransactions && global.specialTransactions[txid])
 					div(class="alert alert-primary", style="padding-bottom: 0;")
-						div(class="float-left", style="width: 50px; height: 50px; font-size: 18px;")
+						div(class="float-left", style="width: 55px; height: 55px; font-size: 18px;")
 							i(class="fas fa-certificate fa-2x", style="margin-top: 10px;")
 
-						h4(class="alert-heading h5") #{coinConfig.name} Fun
+						h4(class="alert-heading h6 font-weight-bold") #{coinConfig.name} Fun
 
 						// special transaction info
 						- var stInfo = global.specialTransactions[txid];
@@ -93,9 +93,8 @@ block content
 								div(class="summary-table-content monospace")
 									if (result.getrawtransaction.time)
 										td(class="monospace") #{moment.utc(new Date(result.getrawtransaction["time"] * 1000)).format("Y-MM-DD HH:mm:ss")} utc
-											- var timeAgo = moment.duration(moment.utc(new Date()).diff(moment.utc(new Date(parseInt(result.getrawtransaction["time"]) * 1000))));
-											br
-											span(class="text-muted")  (age: #{timeAgo.format()})
+											- var timeAgoTime = result.getrawtransaction["time"];
+											include includes/time-ago.pug
 
 						div(class="row")
 							div(class="summary-table-label") Version
@@ -116,7 +115,7 @@ block content
 								div(class="summary-table-content monospace")
 									if (result.getrawtransaction.locktime < 500000000)
 										span Spendable in block 
-										a(href=("/block-height/" + result.getrawtransaction.locktime)) #{result.getrawtransaction.locktime}
+										a(href=("/block-height/" + result.getrawtransaction.locktime)) #{result.getrawtransaction.locktime.toLocaleString()}
 										span  or later 
 										a(href="https://bitcoin.org/en/developer-guide#locktime-and-sequence-number", data-toggle="tooltip", title="More info about locktime", target="_blank") 
 											i(class="fas fa-info-circle")

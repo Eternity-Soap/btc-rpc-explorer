@@ -17,7 +17,8 @@ Live demos are available at:
 * View block details
 * View transaction details, with navigation "backward" via spent transaction outputs
 * View JSON content used to generate most pages
-* Search supports transactions, blocks, addresses (including bech32)
+* Search supports transactions, blocks, addresses
+* Optional transaction history for addresses by querying configurable ElectrumX servers
 * Mempool summary, with fee, size, and age breakdowns
 * RPC command browser and terminal
 * Currently supports BTC, LTC (support for any Bitcoin-RPC-protocol-compliant coin can be added easily)
@@ -28,17 +29,18 @@ The below instructions are geared toward BTC, but can be adapted easily to other
 
 ## Prerequisites
 
-1. Install and run a full, archiving node - [instructions](https://bitcoin.org/en/full-node). Ensure that your node has full transaction indexing enabled (`txindex=1`) and the RPC server enabled (`server=1`).
+1. Install and run a full, archiving node - [instructions](https://bitcoin.org/en/full-node). Ensure that your bitcoin node has full transaction indexing enabled (`txindex=1`) and the RPC server enabled (`server=1`).
 2. Synchronize your node with the Bitcoin network.
+3. "Recent" version of Node.js (8+ recommended).
 
 ## Instructions
 
-1. Clone this repo
+1. Clone this repo: `git clone https://github.com/janoside/btc-rpc-explorer`
 2. `npm install`
 3. `npm run build`
-4. Edit the "rpc" settings in [credentials.js](app/credentials.js) to target your node
-5. Optional: Change the "coin" value in [config.js](app/config.js). Currently supported values are "BTC" and "LTC".
-6. Optional: Add an ipstack.com API access key to [credentials.js](app/credentials.js). Doing so will add a map to the /peers page.
+4. Edit the "rpc" settings in [app/credentials.js](app/credentials.js) to target your node
+5. Optional: Change the "coin" value in [app/config.js](app/config.js). Currently supported values are "BTC" and "LTC".
+6. Optional: Add an ipstack.com API access key to [app/credentials.js](app/credentials.js). Doing so will add a map to the /peers page.
 7. `npm start` to start the local server
 8. Visit http://127.0.0.1:3002/
 
@@ -47,57 +49,15 @@ The below instructions are geared toward BTC, but can be adapted easily to other
 1. `docker build -t btc-rpc-explorer .`
 2. `docker run -p 3002:3002 -it btc-rpc-explorer`
 
-# Screenshots
-
-<table>
-  <tr>
-    <td valign="top">
-      <h4>Homepage (list of recent blocks)</h4>
-      <img src="public/img/screenshots/home.png" style="margin-right:5px; border: 1px solid #ccc;" />
-    </td>
-    <td valign="top">
-      <h4>Node Details</h4>
-      <img src="public/img/screenshots/node-details.png" style="margin-right:5px; border: 1px solid #ccc;" />
-    </td>
-    <td valign="top">
-      <h4>Transaction Details</h4>
-      <img src="public/img/screenshots/transaction.png" style="margin-right:5px; border: 1px solid #ccc;" />
-    </td>
-  </tr>
-  <tr>
-    <td valign="top">
-      <h4>Browse Blocks</h4>
-      <img src="public/img/screenshots/blocks.png" style="margin-right:5px; border: 1px solid #ccc;" />
-    </td>
-    <td valign="top">
-      <h4>Block Details</h4>
-      <img src="public/img/screenshots/block.png" style="margin-right:5px; border: 1px solid #ccc;" />
-    </td>
-    <td valign="top">
-      <h4>Mempool Summary</h4>
-      <img src="public/img/screenshots/mempool-summary.png" style="margin-right:5px; border: 1px solid #ccc;" />
-    </td>
-  </tr>
-  <tr>
-    <td valign="top">
-      <h4>Transaction, Raw JSON</h4>
-      <img src="public/img/screenshots/transaction-raw.png" style="margin-right:5px; border: 1px solid #ccc;" />
-    </td>
-    <td valign="top">
-      <h4>RPC Browser</h4>
-      <img src="public/img/screenshots/rpc-browser.png" style="margin-right:5px; border: 1px solid #ccc;" />
-    </td>
-    <td valign="top">
-      <h4>Connect via RPC</h4>
-      <img src="public/img/screenshots/connect.png" style="margin-right:5px; border: 1px solid #ccc;" />
-    </td>
-  </tr>
-</table>
-
 # Donate
 
-To support continued development of this tool and/or to support the hosting of the live demo site:
+Any support for continued development of this tool is appreciated!
 
 * [Bitcoin](bitcoin:3NPGpNyLLmVKCEcuipBs7G4KpQJoJXjDGe): 3NPGpNyLLmVKCEcuipBs7G4KpQJoJXjDGe
+
+![Bitcoin Donation QR Code](/public/img/qr-btc.png)
+
 * [Litecoin](litecoin:ME4pXiXuWfEi1ANBDo9irUJVcZBhsTx14i): ME4pXiXuWfEi1ANBDo9irUJVcZBhsTx14i
+
+![Litecoin Donation QR Code](/public/img/qr-ltc.png)
 

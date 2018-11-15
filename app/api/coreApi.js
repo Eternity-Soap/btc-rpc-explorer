@@ -25,8 +25,13 @@ function getGenesisCoinbaseTransactionId() {
 
 
 
-function tryCacheThenRpcApi(cache, cacheKey, cacheMaxAge, rpcApiFunction) {
+function tryCacheThenRpcApi(cache, cacheKey, cacheMaxAge, rpcApiFunction, cacheConditionFunction) {
 	//console.log("tryCache: " + cacheKey + ", " + cacheMaxAge);
+	if (cacheConditionFunction == null) {
+		cacheConditionFunction = function(obj) {
+			return true;
+		};
+	}
 
 	return new Promise(function(resolve, reject) {
 		var result = cache.get(cacheKey);
@@ -35,17 +40,18 @@ function tryCacheThenRpcApi(cache, cacheKey, cacheMaxAge, rpcApiFunction) {
 
 		} else {
 			rpcApiFunction().then(function(result) {
-				if (result) {
+				if (result != null && cacheConditionFunction(result)) {
 					cache.set(cacheKey, result, cacheMaxAge);
-
-					resolve(result);
-
-				} else {
-					resolve(result);
 				}
+
+				resolve(result);
 			});
 		}
 	});
+}
+
+function shouldCacheTransaction(tx) {
+	return (tx.confirmations > 0);
 }
 
 
@@ -172,7 +178,7 @@ function getMempoolDetails(start, count) {
 			}
 
 			getRawTransactions(txids).then(function(transactions) {
-				var maxInputsTracked = config.site.blockTxMaxInput;
+				var maxInputsTracked = config.site.txMaxInput;
 				var vinTxids = [];
 				for (var i = 0; i < transactions.length; i++) {
 					var transaction = transactions[i];
@@ -490,9 +496,11 @@ function getBlocksByHash(blockHashes) {
 }
 
 function getRawTransaction(txid) {
-	return tryCacheThenRpcApi(txCache, "getRawTransaction-" + txid, 3600000, function() {
+	var rpcApiFunction = function() {
 		return rpcApi.getRawTransaction(txid);
-	});
+	};
+
+	return tryCacheThenRpcApi(txCache, "getRawTransaction-" + txid, 3600000, rpcApiFunction, shouldCacheTransaction);
 }
 
 function getAddress(address) {
@@ -529,7 +537,9 @@ function getRawTransactions(txids) {
 						if (queriedTx != null) {
 							combinedTxs.push(queriedTx);
 
-							txCache.set("getRawTransaction-" + queriedTx.txid, queriedTx, 3600000);
+							if (shouldCacheTransaction(queriedTx)) {
+								txCache.set("getRawTransaction-" + queriedTx.txid, queriedTx, 3600000);
+							}
 						}
 
 						queriedTxsCurrentIndex++;
@@ -545,6 +555,57 @@ function getRawTransactions(txids) {
 
 			resolve(combinedTxs);
 		}
+	});
+}
+
+function getRawTransactionsWithInputs(txids, maxInputs=-1) {
+	return new Promise(function(resolve, reject) {
+		getRawTransactions(txids).then(function(transactions) {
+			var maxInputsTracked = config.site.txMaxInput;
+			
+			if (maxInputs <= 0) {
+				maxInputsTracked = 1000000;
+
+			} else if (maxInputs > 0) {
+				maxInputsTracked = maxInputs;
+			}
+
+			var vinTxids = [];
+			for (var i = 0; i < transactions.length; i++) {
+				var transaction = transactions[i];
+
+				if (transaction && transaction.vin) {
+					for (var j = 0; j < Math.min(maxInputsTracked, transaction.vin.length); j++) {
+						if (transaction.vin[j].txid) {
+							vinTxids.push(transaction.vin[j].txid);
+						}
+					}
+				}
+			}
+
+			var txInputsByTransaction = {};
+			getRawTransactions(vinTxids).then(function(vinTransactions) {
+				var vinTxById = {};
+
+				vinTransactions.forEach(function(tx) {
+					vinTxById[tx.txid] = tx;
+				});
+
+				transactions.forEach(function(tx) {
+					txInputsByTransaction[tx.txid] = {};
+
+					if (tx && tx.vin) {
+						for (var i = 0; i < Math.min(maxInputsTracked, tx.vin.length); i++) {
+							if (vinTxById[tx.vin[i].txid]) {
+								txInputsByTransaction[tx.txid][i] = vinTxById[tx.vin[i].txid];
+							}
+						}
+					}
+				});
+
+				resolve({ transactions:transactions, txInputsByTransaction:txInputsByTransaction });
+			});
+		});
 	});
 }
 
@@ -573,7 +634,7 @@ function getBlockByHashWithTransactions(blockHash, txLimit, txOffset) {
 					transactions.shift();
 				}
 
-				var maxInputsTracked = config.site.blockTxMaxInput;
+				var maxInputsTracked = config.site.txMaxInput;
 				var vinTxids = [];
 				for (var i = 0; i < transactions.length; i++) {
 					var transaction = transactions[i];
@@ -648,6 +709,7 @@ module.exports = {
 	getBlockByHashWithTransactions: getBlockByHashWithTransactions,
 	getRawTransaction: getRawTransaction,
 	getRawTransactions: getRawTransactions,
+	getRawTransactionsWithInputs: getRawTransactionsWithInputs,
 	getMempoolStats: getMempoolStats,
 	getUptimeSeconds: getUptimeSeconds,
 	getHelp: getHelp,

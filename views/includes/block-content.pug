@@ -10,9 +10,9 @@ div(class="tab-content")
 	div(id="tab-details", class="tab-pane active", role="tabpanel")
 		if (global.specialBlocks && global.specialBlocks[result.getblock.hash])
 			div(class="alert alert-primary", style="padding-bottom: 0;")
-				div(class="float-left", style="width: 50px; height: 50px; font-size: 18px;")
+				div(class="float-left", style="width: 55px; height: 55px; font-size: 18px;")
 					i(class="fas fa-certificate fa-2x", style="margin-top: 10px;")
-				h4(class="alert-heading h5") #{coinConfig.name} Fun
+				h4(class="alert-heading h6 font-weight-bold") #{coinConfig.name} Fun
 
 				// special transaction info
 				- var sbInfo = global.specialBlocks[result.getblock.hash];
@@ -52,10 +52,9 @@ div(class="tab-content")
 						div(class="row")
 							div(class="summary-split-table-label") Timestamp
 							div(class="summary-split-table-content monospace")
-								- var timeAgo = moment.duration(moment.utc(new Date()).diff(moment.utc(new Date(parseInt(result.getblock.time) * 1000))));
 								span #{moment.utc(new Date(result.getblock.time * 1000)).format("Y-MM-DD HH:mm:ss")} utc
-								br
-								span(class="text-muted")  (age #{timeAgo.format()})
+								- var timeAgoTime = result.getblock.time;
+								include ./time-ago.pug
 
 						div(class="row")
 							div(class="summary-split-table-label") Transactions
@@ -102,7 +101,7 @@ div(class="tab-content")
 
 						div(class="row")
 							div(class="summary-split-table-label") Size
-							div(class="summary-split-table-content monospace") span #{result.getblock.size.toLocaleString()} bytes
+							div(class="summary-split-table-content monospace") #{result.getblock.size.toLocaleString()} bytes
 
 						div(class="row")
 							div(class="summary-split-table-label") Confirmations
@@ -213,11 +212,11 @@ div(class="tab-content")
 					//pre
 					//	code #{JSON.stringify(tx, null, 4)}
 					div(class="xcard mb-3")
-						div(class="card-header")
+						div(class="card-header monospace")
 							if (tx && tx.txid)
 								span ##{(txIndex + offset + 1).toLocaleString()}
 								span  &ndash; 
-								a(href=("/tx/" + tx.txid), class="monospace") #{tx.txid}
+								a(href=("/tx/" + tx.txid)) #{tx.txid}
 
 								if (global.specialTransactions && global.specialTransactions[tx.txid])
 									span  

@@ -1,41 +1,93 @@
 var credentials = require("./credentials.js");
 var coins = require("./coins.js");
 
-var currentCoin = "SUM";
-
 module.exports = {
 	cookiePassword: "0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
 	demoSite: true,
 	coin: currentCoin,
 
 	rpcBlacklist:[
+<<<<<<< HEAD
 		"stop",
 		"savemempool",
 		"sendtoaddress",
+||||||| merged common ancestors
+		"stop",
+		"savemempool",
+=======
+>>>>>>> b4304498a89a6788825bc4896d0df2deb7d066eb
 		"addnode",
+		"backupwallet",
+		"bumpfee",
+		"clearbanned",
+		"createmultisig",
 		"disconnectnode",
 		"dumpprivkey",
 		"dumpwallet",
-		"setban",
-		"clearbanned",
-		"setnetworkactive",
+		"encryptwallet",
+		"generate",
+		"generatetoaddress",
+		"getaccountaddrss",
+		"getaddressesbyaccount",
+		"getbalance",
+		"getnewaddress",
+		"getrawchangeaddress",
+		"getreceivedbyaccount",
+		"getreceivedbyaddress",
+		"gettransaction",
+		"getunconfirmedbalance",
+		"getwalletinfo",
+		"importaddress",
+		"importmulti",
+		"importprivkey",
+		"importprunedfunds",
+		"importpubkey",
+		"importwallet",
+		"keypoolrefill",
+		"listaccounts",
+		"listaddressgroupings",
+		"listlockunspent",
+		"listreceivedbyaccount",
+		"listreceivedbyaddress",
+		"listsinceblock",
+		"listtransactions",
+		"listunspent",
+		"listwallets",
 		"lockunspent",
+		"logging",
 		"move",
+		"preciousblock",
+		"pruneblockchain",
 		"removeprunedfunds",
 		"rescanblockchain",
-		"encryptwallet",
-		"backupwallet",
-		"importwallet",
+		"savemempool",
+		"sendfrom",
+		"sendmany",
+		"sendtoaddress",
+		"sendrawtransaction",
+		"setaccount",
+		"setban",
+		"setnetworkactive",
+		"signmessage",
+		"signmessagewithprivatekey",
+		"signrawtransaction",
+		"stop",
+		"submitblock",
+		"verifychain",
 		"walletlock",
 		"walletpassphrase",
 		"walletpassphrasechange",
-		"verifychain",
-		"pruneblockchain"
+	],
+
+	// https://uasf.saltylemon.org/electrum
+	electrumXServers:[
+		// {host: "electrum.example.com", port:50002}, ...
 	],
 
 	site: {
 		blockTxPageSize:20,
-		blockTxMaxInput:15,
+		addressTxPageSize:20,
+		txMaxInput:15,
 		browseBlocksPageSize:20
 	},
 
@@ -62,9 +114,10 @@ module.exports = {
 
 	donationAddresses:{
 		coins:["BTC", "LTC"],
+		sites:{"BTC":"https://btc.chaintools.io", "LTC":"https://ltc.chaintools.io"},
 
-		"BTC":{address:"3NPGpNyLLmVKCEcuipBs7G4KpQJoJXjDGe", urlPrefix:"bitcoin:"},
-		"LTC":{address:"ME4pXiXuWfEi1ANBDo9irUJVcZBhsTx14i", urlPrefix:"litecoin:"}
+		"BTC":{address:"3NPGpNyLLmVKCEcuipBs7G4KpQJoJXjDGe"},
+		"LTC":{address:"ME4pXiXuWfEi1ANBDo9irUJVcZBhsTx14i"}
 	},
 
 	headerDropdownLinks: {
